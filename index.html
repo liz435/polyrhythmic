@@ -17,14 +17,17 @@
       color: #f0f0f0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       min-height: 100vh;
+      overflow-x: hidden;
     }
     #controls {
-      width: 800px;
+      width: 100%;
+      max-width: 800px;
       margin: 15px 0 30px 0;
       padding: 25px;
       background-color: #1a1a1a;
       border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      box-sizing: border-box;
     }
     .main-controls {
       display: flex;
@@ -44,6 +47,7 @@
       font-weight: 600;
       transition: all 0.2s ease;
       flex: 1;
+      touch-action: manipulation;
     }
     button:hover {
       background-color: #4361ee;
@@ -120,7 +124,7 @@
     }
     .toggle-container {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
       gap: 12px;
       margin: 24px 0;
     }
@@ -144,6 +148,7 @@
       font-size: 32px;
       font-weight: 700;
       text-align: center;
+      padding: 0 15px;
     }
     h1 span {
       background: linear-gradient(45deg, #3a86ff, #ff006e);
@@ -156,16 +161,23 @@
       color: #a0a0a0;
       margin: 0 0 20px 0;
       text-align: center;
+      padding: 0 15px;
     }
     #canvas-container {
       margin-bottom: 30px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
       border-radius: 12px;
       overflow: hidden;
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      justify-content: center;
     }
     canvas {
       display: block;
       border-radius: 12px;
+      max-width: 100%;
+      height: auto !important;
     }
     .shape-label {
       font-size: 11px;
@@ -181,9 +193,106 @@
     .toggle-btn[data-sides="7"] { color: hsl(180, 80%, 70%); }
     .toggle-btn[data-sides="8"] { color: hsl(240, 80%, 70%); }
     .toggle-btn[data-sides="9"] { color: hsl(280, 80%, 70%); }
+    
+    /* Audio context message */
+    #audio-message {
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+      text-align: center;
+    }
+    #audio-message button {
+      margin-top: 20px;
+      padding: 15px 30px;
+      font-size: 18px;
+      background-color: #10b981;
+    }
+    
+    /* Loading indicator */
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #0a0a0a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      border-top-color: #3a86ff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Media queries for responsive design */
+    @media (max-width: 850px) {
+      #controls {
+        margin: 15px 15px 30px 15px;
+        width: calc(100% - 30px);
+      }
+      .main-controls {
+        flex-direction: row;
+      }
+      button {
+        padding: 10px;
+        font-size: 14px;
+      }
+      #canvas-container {
+        margin: 0 15px 30px 15px;
+        width: calc(100% - 30px);
+      }
+    }
+    
+    @media (max-width: 500px) {
+      .toggle-container {
+        grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+      }
+      .toggle-btn {
+        padding: 10px 0;
+        font-size: 12px;
+      }
+      .shape-label {
+        font-size: 9px;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      .subtitle {
+        font-size: 14px;
+      }
+    }
   </style>
 </head>
 <body>
+  <div id="loading">
+    <div class="spinner"></div>
+  </div>
+  
+  <div id="audio-message" style="display: none;">
+    <h2>Enable Audio</h2>
+    <p>Click the button below to enable audio for this experience.</p>
+    <button id="enable-audio">Start Experience</button>
+  </div>
+  
   <h1><span>Polyrhythmic</span> Beat Maker</h1>
   <p class="subtitle">Experience geometric rhythms with synchronized polygon patterns</p>
   <div id="canvas-container"></div>
@@ -239,6 +348,9 @@
     let masterVolume = 0.5;
     let startTime = 0;
     let elapsedTime = 0;
+    let audioContextStarted = false;
+    let p5Instance;
+    let canvasWidth, canvasHeight;
     
     // Colors for each polygon (in HSB)
     const colors = [
@@ -254,109 +366,195 @@
     // Common rotation time for all polygons (in seconds)
     const rotationTime = 6; // All polygons complete one loop in 6 seconds
     
-    function preload() {
-      // Preload sounds - we'll create them in setup instead
+    // Show audio context message
+    document.getElementById('enable-audio').addEventListener('click', function() {
+      document.getElementById('audio-message').style.display = 'none';
+      startAudioContext();
+    });
+    
+    // Function to start audio context
+    function startAudioContext() {
+      if (audioContextStarted) return;
+      
+      // Create p5 instance
+      p5Instance = new p5(sketch);
+      audioContextStarted = true;
     }
     
-    function setup() {
-      let canvas = createCanvas(800, 600);
-      canvas.parent('canvas-container');
-      colorMode(HSB, 360, 100, 100, 1);
-      
-      // Create oscillators for each polygon
-      for (let i = 0; i < 7; i++) {
-        let osc = new p5.Oscillator();
-        
-        // Create different timbres based on polygon
-        if (i % 3 === 0) {
-          osc.setType('sine');
-        } else if (i % 3 === 1) {
-          osc.setType('triangle');
-        } else {
-          osc.setType('square');
-        }
-        
-        // Set frequency based on pentatonic scale (A minor pentatonic)
-        const frequencies = [440, 523.25, 587.33, 659.25, 783.99, 880, 1046.50];
-        osc.freq(frequencies[i]);
-        
-        osc.amp(0);
-        osc.start();
-        sounds.push(osc);
+    // Handle window resize
+    function handleResize() {
+      if (p5Instance && p5Instance.resizeCanvas) {
+        updateCanvasSize();
+        p5Instance.resizeCanvas(canvasWidth, canvasHeight);
       }
-      
-      // Create polygons
-      for (let i = 0; i < 7; i++) {
-        const sides = i + 3; // 3 to 9 sides
-        const radius = map(sides, 3, 9, 100, 220); // Size increases with sides
-        
-        // Calculate vertices once
-        const vertices = [];
-        for (let j = 0; j < sides; j++) {
-          const angle = TWO_PI * j / sides - HALF_PI;
-          vertices.push({
-            x: radius * cos(angle),
-            y: radius * sin(angle)
-          });
-        }
-        
-        const polygon = {
-          sides: sides,
-          radius: radius,
-          vertices: vertices,
-          color: colors[i],
-          currentEdge: 0,
-          edgeProgress: 0,
-          speed: sides, // Multiply by sides - more sides = faster overall movement
-          active: true,
-          lastVertex: 0,
-          nextVertex: 1
-        };
-        polygons.push(polygon);
-      }
-      
-      // Set up UI controls
-      document.getElementById('play-btn').addEventListener('click', function() {
-        if (!isPlaying) {
-          startTime = millis() - elapsedTime;
-          isPlaying = true;
-        }
-      });
-      
-      document.getElementById('stop-btn').addEventListener('click', function() {
-        if (isPlaying) {
-          elapsedTime = millis() - startTime;
-          isPlaying = false;
-        }
-      });
-      
-      document.getElementById('reset-btn').addEventListener('click', function() {
-        resetPositions();
-        startTime = millis();
-        elapsedTime = 0;
-      });
-      
-      document.getElementById('master-speed').addEventListener('input', function() {
-        masterSpeed = parseFloat(this.value);
-        document.getElementById('master-speed-value').textContent = masterSpeed.toFixed(2) + '×';
-      });
-      
-      document.getElementById('master-volume').addEventListener('input', function() {
-        masterVolume = parseFloat(this.value);
-        document.getElementById('master-volume-value').textContent = Math.round(masterVolume * 100) + '%';
-      });
-      
-      // Set up toggle buttons
-      const toggleButtons = document.querySelectorAll('.toggle-btn');
-      toggleButtons.forEach(btn => {
-        btn.addEventListener('click', function() {
-          const sides = parseInt(this.getAttribute('data-sides'));
-          const index = sides - 3;
-          polygons[index].active = !polygons[index].active;
-          this.classList.toggle('active');
-        });
-      });
     }
+    
+    function updateCanvasSize() {
+      const container = document.getElementById('canvas-container');
+      const containerWidth = container.clientWidth;
+      
+      // Set canvas size based on container width
+      if (containerWidth < 500) {
+        canvasWidth = containerWidth;
+        canvasHeight = containerWidth * 0.75; // 4:3 ratio for small screens
+      } else {
+        canvasWidth = Math.min(containerWidth, 800);
+        canvasHeight = 600;
+      }
+    }
+    
+    // Add resize event listener
+    window.addEventListener('resize', handleResize);
+    
+    // Main p5.js sketch
+    const sketch = function(p) {
+      p.preload = function() {
+        // Preload sounds - we'll create them in setup instead
+      };
+      
+      p.setup = function() {
+        updateCanvasSize();
+        let canvas = p.createCanvas(canvasWidth, canvasHeight);
+        canvas.parent('canvas-container');
+        p.colorMode(p.HSB, 360, 100, 100, 1);
+        
+        // Create oscillators for each polygon
+        for (let i = 0; i < 7; i++) {
+          let osc = new p5.Oscillator();
+          
+          // Create different timbres based on polygon
+          if (i % 3 === 0) {
+            osc.setType('sine');
+          } else if (i % 3 === 1) {
+            osc.setType('triangle');
+          } else {
+            osc.setType('square');
+          }
+          
+          // Set frequency based on pentatonic scale (A minor pentatonic)
+          const frequencies = [440, 523.25, 587.33, 659.25, 783.99, 880, 1046.50];
+          osc.freq(frequencies[i]);
+          
+          osc.amp(0);
+          osc.start();
+          sounds.push(osc);
+        }
+        
+        // Create polygons
+        for (let i = 0; i < 7; i++) {
+          const sides = i + 3; // 3 to 9 sides
+          const radius = p.map(sides, 3, 9, canvasWidth * 0.125, canvasWidth * 0.275); // Size increases with sides, responsive
+          
+          // Calculate vertices once
+          const vertices = [];
+          for (let j = 0; j < sides; j++) {
+            const angle = p.TWO_PI * j / sides - p.HALF_PI;
+            vertices.push({
+              x: radius * p.cos(angle),
+              y: radius * p.sin(angle)
+            });
+          }
+          
+          const polygon = {
+            sides: sides,
+            radius: radius,
+            vertices: vertices,
+            color: colors[i],
+            currentEdge: 0,
+            edgeProgress: 0,
+            speed: sides, // Multiply by sides - more sides = faster overall movement
+            active: true,
+            lastVertex: 0,
+            nextVertex: 1
+          };
+          polygons.push(polygon);
+        }
+        
+        // Hide loading screen
+        document.getElementById('loading').style.display = 'none';
+        
+        // Show audio message if needed
+        if (p.getAudioContext().state !== 'running') {
+          document.getElementById('audio-message').style.display = 'flex';
+        }
+      };
+      
+      p.draw = function() {
+        p.background(12);
+        
+        // Calculate global time position for perfect sync
+        let currentTime = isPlaying ? (p.millis() - startTime) / 1000 : elapsedTime / 1000;
+        let normalizedTime = (currentTime * masterSpeed) % rotationTime;
+        let cyclePosition = normalizedTime / rotationTime; // 0 to 1 for a complete cycle
+        
+        // Draw all polygons
+        p.push();
+        p.translate(p.width / 2, p.height / 2);
+        
+        polygons.forEach((polygon, index) => {
+          if (!polygon.active) return;
+          
+          const sides = polygon.sides;
+          const vertices = polygon.vertices;
+          const color = polygon.color;
+          
+          // Calculate position based on global time
+          // Each polygon completes one full rotation in 'rotationTime' seconds
+          // But travels through 'sides' number of edges in that time
+          
+          // Calculate which edge we're on (0 to sides-1)
+          const totalProgress = cyclePosition * sides;
+          const currentEdge = Math.floor(totalProgress) % sides;
+          const edgeProgress = totalProgress % 1;
+          
+          // If we're at a new vertex and playing, trigger sound
+          if (isPlaying && polygon.currentEdge !== currentEdge) {
+            playSound(index);
+          }
+          
+          // Update polygon state
+          polygon.currentEdge = currentEdge;
+          polygon.edgeProgress = edgeProgress;
+          polygon.lastVertex = currentEdge;
+          polygon.nextVertex = (currentEdge + 1) % sides;
+          
+          // Calculate current ball position along the edge
+          const v1 = vertices[polygon.lastVertex];
+          const v2 = vertices[polygon.nextVertex];
+          const ballX = p.lerp(v1.x, v2.x, polygon.edgeProgress);
+          const ballY = p.lerp(v1.y, v2.y, polygon.edgeProgress);
+          
+          // Draw polygon
+          p.push();
+          p.noFill();
+          p.strokeWeight(2);
+          p.stroke(color[0], color[1], color[2], 0.6);
+          
+          p.beginShape();
+          for (let i = 0; i < sides; i++) {
+            const v = vertices[i];
+            p.vertex(v.x, v.y);
+            
+            // Draw vertices more prominently
+            p.push();
+            p.fill(color[0], color[1], color[2]);
+            p.noStroke();
+            p.circle(v.x, v.y, 10);
+            p.pop();
+          }
+          p.endShape(p.CLOSE);
+          
+          // Draw ball
+          p.fill(color[0], color[1], 100);
+          p.noStroke();
+          p.circle(ballX, ballY, 15);
+          
+          p.pop();
+        });
+        
+        p.pop();
+      };
+    };
     
     function resetPositions() {
       polygons.forEach(polygon => {
@@ -367,90 +565,92 @@
       });
     }
     
-    function draw() {
-      background(12);
-      
-      // Calculate global time position for perfect sync
-      let currentTime = isPlaying ? (millis() - startTime) / 1000 : elapsedTime / 1000;
-      let normalizedTime = (currentTime * masterSpeed) % rotationTime;
-      let cyclePosition = normalizedTime / rotationTime; // 0 to 1 for a complete cycle
-      
-      // Draw all polygons
-      push();
-      translate(width / 2, height / 2);
-      
-      polygons.forEach((polygon, index) => {
-        if (!polygon.active) return;
-        
-        const sides = polygon.sides;
-        const vertices = polygon.vertices;
-        const color = polygon.color;
-        
-        // Calculate position based on global time
-        // Each polygon completes one full rotation in 'rotationTime' seconds
-        // But travels through 'sides' number of edges in that time
-        
-        // Calculate which edge we're on (0 to sides-1)
-        const totalProgress = cyclePosition * sides;
-        const currentEdge = Math.floor(totalProgress) % sides;
-        const edgeProgress = totalProgress % 1;
-        
-        // If we're at a new vertex and playing, trigger sound
-        if (isPlaying && polygon.currentEdge !== currentEdge) {
-          playSound(index);
-        }
-        
-        // Update polygon state
-        polygon.currentEdge = currentEdge;
-        polygon.edgeProgress = edgeProgress;
-        polygon.lastVertex = currentEdge;
-        polygon.nextVertex = (currentEdge + 1) % sides;
-        
-        // Calculate current ball position along the edge
-        const v1 = vertices[polygon.lastVertex];
-        const v2 = vertices[polygon.nextVertex];
-        const ballX = lerp(v1.x, v2.x, polygon.edgeProgress);
-        const ballY = lerp(v1.y, v2.y, polygon.edgeProgress);
-        
-        // Draw polygon
-        push();
-        noFill();
-        strokeWeight(2);
-        stroke(color[0], color[1], color[2], 0.6);
-        
-        beginShape();
-        for (let i = 0; i < sides; i++) {
-          const v = vertices[i];
-          vertex(v.x, v.y);
-          
-          // Draw vertices more prominently
-          push();
-          fill(color[0], color[1], color[2]);
-          noStroke();
-          circle(v.x, v.y, 10);
-          pop();
-        }
-        endShape(CLOSE);
-        
-        // Draw ball
-        fill(color[0], color[1], 100);
-        noStroke();
-        circle(ballX, ballY, 15);
-        
-        pop();
-      });
-      
-      pop();
-    }
-    
     function playSound(index) {
-      if (!isPlaying) return;
+      if (!isPlaying || !audioContextStarted) return;
       
       // Play sound with short envelope
       const osc = sounds[index];
       osc.amp(masterVolume, 0.001);
       osc.amp(0, 0.1, 0.05);
     }
+    
+    // Set up UI controls
+    document.getElementById('play-btn').addEventListener('click', function() {
+      if (!audioContextStarted) {
+        startAudioContext();
+      }
+      
+      if (!isPlaying) {
+        // Make sure audio context is running
+        if (p5Instance && p5Instance.getAudioContext().state !== 'running') {
+          p5Instance.getAudioContext().resume();
+        }
+        
+        startTime = p5Instance ? p5Instance.millis() - elapsedTime : performance.now() - elapsedTime;
+        isPlaying = true;
+      }
+    });
+    
+    document.getElementById('stop-btn').addEventListener('click', function() {
+      if (isPlaying) {
+        elapsedTime = p5Instance ? p5Instance.millis() - startTime : performance.now() - startTime;
+        isPlaying = false;
+      }
+    });
+    
+    document.getElementById('reset-btn').addEventListener('click', function() {
+      resetPositions();
+      if (p5Instance) {
+        startTime = p5Instance.millis();
+      } else {
+        startTime = performance.now();
+      }
+      elapsedTime = 0;
+    });
+    
+    document.getElementById('master-speed').addEventListener('input', function() {
+      masterSpeed = parseFloat(this.value);
+      document.getElementById('master-speed-value').textContent = masterSpeed.toFixed(2) + '×';
+    });
+    
+    document.getElementById('master-volume').addEventListener('input', function() {
+      masterVolume = parseFloat(this.value);
+      document.getElementById('master-volume-value').textContent = Math.round(masterVolume * 100) + '%';
+    });
+    
+    // Set up toggle buttons
+    const toggleButtons = document.querySelectorAll('.toggle-btn');
+    toggleButtons.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const sides = parseInt(this.getAttribute('data-sides'));
+        const index = sides - 3;
+        if (polygons[index]) {
+          polygons[index].active = !polygons[index].active;
+        }
+        this.classList.toggle('active');
+      });
+    });
+    
+    // Check if the browser supports AudioContext
+    document.addEventListener('DOMContentLoaded', function() {
+      // If AudioContext is supported and autoplay is allowed, start immediately
+      if (window.AudioContext || window.webkitAudioContext) {
+        const tempContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (tempContext.state === 'running') {
+          tempContext.close();
+          startAudioContext();
+        } else {
+          tempContext.close();
+          // Show the audio message after a short delay
+          setTimeout(() => {
+            document.getElementById('audio-message').style.display = 'flex';
+          }, 1000);
+        }
+      } else {
+        // Browser doesn't support AudioContext
+        alert('Your browser does not support the Web Audio API. Please try a different browser.');
+      }
+    });
   </script>
 </body>
 </html>
