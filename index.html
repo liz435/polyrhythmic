@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Polyrhythmic Beat Maker</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #0a0a0a;
+      color: #f0f0f0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+    }
+    #controls {
+      width: 800px;
+      margin: 15px 0 30px 0;
+      padding: 25px;
+      background-color: #1a1a1a;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    .main-controls {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      gap: 10px;
+    }
+    button {
+      background-color: #3a86ff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      margin: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      flex: 1;
+    }
+    button:hover {
+      background-color: #4361ee;
+      box-shadow: 0 2px 10px rgba(58, 134, 255, 0.4);
+      transform: translateY(-2px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    #play-btn {
+      background-color: #10b981;
+    }
+    #play-btn:hover {
+      background-color: #059669;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+    }
+    #stop-btn {
+      background-color: #ef4444;
+    }
+    #stop-btn:hover {
+      background-color: #dc2626;
+      box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+    }
+    #reset-btn {
+      background-color: #6366f1;
+    }
+    #reset-btn:hover {
+      background-color: #4f46e5;
+      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4);
+    }
+    input[type="range"] {
+      width: 100%;
+      margin: 10px 0;
+      -webkit-appearance: none;
+      height: 8px;
+      border-radius: 5px;
+      background: #2a2a2a;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #3a86ff;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #4361ee;
+      box-shadow: 0 0 0 8px rgba(58, 134, 255, 0.2);
+    }
+    .slider-container {
+      margin: 22px 0;
+      position: relative;
+    }
+    .slider-container label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #a0a0a0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+    .value-display {
+      position: absolute;
+      right: 0;
+      top: 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #3a86ff;
+    }
+    .toggle-container {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 24px 0;
+    }
+    .toggle-btn {
+      background-color: #2a2a2a;
+      padding: 14px 0;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      border-bottom: 3px solid transparent;
+    }
+    .toggle-btn.active {
+      border-bottom: 3px solid currentColor;
+      background-color: #222;
+    }
+    h1 {
+      color: #f0f0f0;
+      margin: 30px 0 10px 0;
+      font-size: 32px;
+      font-weight: 700;
+      text-align: center;
+    }
+    h1 span {
+      background: linear-gradient(45deg, #3a86ff, #ff006e);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      font-size: 16px;
+      color: #a0a0a0;
+      margin: 0 0 20px 0;
+      text-align: center;
+    }
+    #canvas-container {
+      margin-bottom: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      border-radius: 12px;
+    }
+    .shape-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    /* Set specific colors for each toggle button */
+    .toggle-btn[data-sides="3"] { color: hsl(0, 80%, 70%); }
+    .toggle-btn[data-sides="4"] { color: hsl(42, 80%, 70%); }
+    .toggle-btn[data-sides="5"] { color: hsl(60, 80%, 70%); }
+    .toggle-btn[data-sides="6"] { color: hsl(120, 80%, 70%); }
+    .toggle-btn[data-sides="7"] { color: hsl(180, 80%, 70%); }
+    .toggle-btn[data-sides="8"] { color: hsl(240, 80%, 70%); }
+    .toggle-btn[data-sides="9"] { color: hsl(280, 80%, 70%); }
+  </style>
+</head>
+<body>
+  <h1><span>Polyrhythmic</span> Beat Maker</h1>
+  <p class="subtitle">Experience geometric rhythms with synchronized polygon patterns</p>
+  <div id="canvas-container"></div>
+  <div id="controls">
+    <div class="main-controls">
+      <button id="play-btn">Play</button>
+      <button id="stop-btn">Stop</button>
+      <button id="reset-btn">Reset</button>
+    </div>
+    
+    <div class="toggle-container">
+      <button class="toggle-btn active" data-sides="3">
+        Triangle<br><span class="shape-label">3 beats</span>
+      </button>
+      <button class="toggle-btn active" data-sides="4">
+        Square<br><span class="shape-label">4 beats</span>
+      </button>
+      <button class="toggle-btn active" data-sides="5">
+        Pentagon<br><span class="shape-label">5 beats</span>
+      </button>
+      <button class="toggle-btn active" data-sides="6">
+        Hexagon<br><span class="shape-label">6 beats</span>
+      </button>
+      <button class="toggle-btn active" data-sides="7">
+        Heptagon<br><span class="shape-label">7 beats</span>
+      </button>
+      <button class="toggle-btn active" data-sides="8">
+        Octagon<br><span class="shape-label">8 beats</span>
+      </button>
+      <button class="toggle-btn active" data-sides="9">
+        Nonagon<br><span class="shape-label">9 beats</span>
+      </button>
+    </div>
+    
+    <div class="slider-container">
+      <label>Tempo</label>
+      <input type="range" id="master-speed" min="0.25" max="2" step="0.05" value="1">
+      <span id="master-speed-value" class="value-display">1.0×</span>
+    </div>
+    
+    <div class="slider-container">
+      <label>Volume</label>
+      <input type="range" id="master-volume" min="0" max="1" step="0.01" value="0.5">
+      <span id="master-volume-value" class="value-display">50%</span>
+    </div>
+  </div>
+
+  <script>
+    let polygons = [];
+    let sounds = [];
+    let isPlaying = false;
+    let masterSpeed = 1.0;
+    let masterVolume = 0.5;
+    let startTime = 0;
+    let elapsedTime = 0;
+    
+    // Colors for each polygon (in HSB)
+    const colors = [
+      [0, 80, 90],    // Red (Triangle)
+      [42, 80, 90],   // Orange (Square)
+      [60, 80, 90],   // Yellow (Pentagon)
+      [120, 80, 90],  // Green (Hexagon)
+      [180, 80, 90],  // Cyan (Heptagon)
+      [240, 80, 90],  // Blue (Octagon)
+      [280, 80, 90]   // Purple (Nonagon)
+    ];
+    
+    // Common rotation time for all polygons (in seconds)
+    const rotationTime = 6; // All polygons complete one loop in 6 seconds
+    
+    function preload() {
+      // Preload sounds - we'll create them in setup instead
+    }
+    
+    function setup() {
+      let canvas = createCanvas(800, 600);
+      canvas.parent('canvas-container');
+      colorMode(HSB, 360, 100, 100, 1);
+      
+      // Create oscillators for each polygon
+      for (let i = 0; i < 7; i++) {
+        let osc = new p5.Oscillator();
+        
+        // Create different timbres based on polygon
+        if (i % 3 === 0) {
+          osc.setType('sine');
+        } else if (i % 3 === 1) {
+          osc.setType('triangle');
+        } else {
+          osc.setType('square');
+        }
+        
+        // Set frequency based on pentatonic scale (A minor pentatonic)
+        const frequencies = [440, 523.25, 587.33, 659.25, 783.99, 880, 1046.50];
+        osc.freq(frequencies[i]);
+        
+        osc.amp(0);
+        osc.start();
+        sounds.push(osc);
+      }
+      
+      // Create polygons
+      for (let i = 0; i < 7; i++) {
+        const sides = i + 3; // 3 to 9 sides
+        const radius = map(sides, 3, 9, 100, 220); // Size increases with sides
+        
+        // Calculate vertices once
+        const vertices = [];
+        for (let j = 0; j < sides; j++) {
+          const angle = TWO_PI * j / sides - HALF_PI;
+          vertices.push({
+            x: radius * cos(angle),
+            y: radius * sin(angle)
+          });
+        }
+        
+        const polygon = {
+          sides: sides,
+          radius: radius,
+          vertices: vertices,
+          color: colors[i],
+          currentEdge: 0,
+          edgeProgress: 0,
+          speed: sides, // Multiply by sides - more sides = faster overall movement
+          active: true,
+          lastVertex: 0,
+          nextVertex: 1
+        };
+        polygons.push(polygon);
+      }
+      
+      // Set up UI controls
+      document.getElementById('play-btn').addEventListener('click', function() {
+        if (!isPlaying) {
+          startTime = millis() - elapsedTime;
+          isPlaying = true;
+        }
+      });
+      
+      document.getElementById('stop-btn').addEventListener('click', function() {
+        if (isPlaying) {
+          elapsedTime = millis() - startTime;
+          isPlaying = false;
+        }
+      });
+      
+      document.getElementById('reset-btn').addEventListener('click', function() {
+        resetPositions();
+        startTime = millis();
+        elapsedTime = 0;
+      });
+      
+      document.getElementById('master-speed').addEventListener('input', function() {
+        masterSpeed = parseFloat(this.value);
+        document.getElementById('master-speed-value').textContent = masterSpeed.toFixed(2) + '×';
+      });
+      
+      document.getElementById('master-volume').addEventListener('input', function() {
+        masterVolume = parseFloat(this.value);
+        document.getElementById('master-volume-value').textContent = Math.round(masterVolume * 100) + '%';
+      });
+      
+      // Set up toggle buttons
+      const toggleButtons = document.querySelectorAll('.toggle-btn');
+      toggleButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+          const sides = parseInt(this.getAttribute('data-sides'));
+          const index = sides - 3;
+          polygons[index].active = !polygons[index].active;
+          this.classList.toggle('active');
+        });
+      });
+    }
+    
+    function resetPositions() {
+      polygons.forEach(polygon => {
+        polygon.currentEdge = 0;
+        polygon.edgeProgress = 0;
+        polygon.lastVertex = 0;
+        polygon.nextVertex = 1;
+      });
+    }
+    
+    function draw() {
+      background(12);
+      
+      // Calculate global time position for perfect sync
+      let currentTime = isPlaying ? (millis() - startTime) / 1000 : elapsedTime / 1000;
+      let normalizedTime = (currentTime * masterSpeed) % rotationTime;
+      let cyclePosition = normalizedTime / rotationTime; // 0 to 1 for a complete cycle
+      
+      // Draw all polygons
+      push();
+      translate(width / 2, height / 2);
+      
+      polygons.forEach((polygon, index) => {
+        if (!polygon.active) return;
+        
+        const sides = polygon.sides;
+        const vertices = polygon.vertices;
+        const color = polygon.color;
+        
+        // Calculate position based on global time
+        // Each polygon completes one full rotation in 'rotationTime' seconds
+        // But travels through 'sides' number of edges in that time
+        
+        // Calculate which edge we're on (0 to sides-1)
+        const totalProgress = cyclePosition * sides;
+        const currentEdge = Math.floor(totalProgress) % sides;
+        const edgeProgress = totalProgress % 1;
+        
+        // If we're at a new vertex and playing, trigger sound
+        if (isPlaying && polygon.currentEdge !== currentEdge) {
+          playSound(index);
+        }
+        
+        // Update polygon state
+        polygon.currentEdge = currentEdge;
+        polygon.edgeProgress = edgeProgress;
+        polygon.lastVertex = currentEdge;
+        polygon.nextVertex = (currentEdge + 1) % sides;
+        
+        // Calculate current ball position along the edge
+        const v1 = vertices[polygon.lastVertex];
+        const v2 = vertices[polygon.nextVertex];
+        const ballX = lerp(v1.x, v2.x, polygon.edgeProgress);
+        const ballY = lerp(v1.y, v2.y, polygon.edgeProgress);
+        
+        // Draw polygon
+        push();
+        noFill();
+        strokeWeight(2);
+        stroke(color[0], color[1], color[2], 0.6);
+        
+        beginShape();
+        for (let i = 0; i < sides; i++) {
+          const v = vertices[i];
+          vertex(v.x, v.y);
+          
+          // Draw vertices more prominently
+          push();
+          fill(color[0], color[1], color[2]);
+          noStroke();
+          circle(v.x, v.y, 10);
+          pop();
+        }
+        endShape(CLOSE);
+        
+        // Draw ball
+        fill(color[0], color[1], 100);
+        noStroke();
+        circle(ballX, ballY, 15);
+        
+        pop();
+      });
+      
+      pop();
+    }
+    
+    function playSound(index) {
+      if (!isPlaying) return;
+      
+      // Play sound with short envelope
+      const osc = sounds[index];
+      osc.amp(masterVolume, 0.001);
+      osc.amp(0, 0.1, 0.05);
+    }
+  </script>
+</body>
+</html>
